@@ -4,6 +4,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 from sklearn.externals import joblib
+import copy
 
 import geopandas as gpd
 import pandas as pd
@@ -30,7 +31,7 @@ layout = dict(
     autosize=True,
     height=670,
     font=dict(color='#fffcfc'),
-    titlefont=dict(color='#fffcfc', size='14'),
+    titlefont=dict(color='#fffcfc', size='16'),
     margin=dict(
         l=35,
         r=35,
@@ -41,7 +42,7 @@ layout = dict(
     plot_bgcolor="#191A1A",
     paper_bgcolor="#020202",
     legend=dict(font=dict(size=10), orientation='h'),
-    title='Hover point in the map to observe measured NOx levels',
+    title='Hover to observe measured pollutant concentrations',
     mapbox=dict(
         accesstoken=mapbox_access_token,
         style="dark",
@@ -53,10 +54,12 @@ layout = dict(
     )
 )
 
-def gen_map(map_data, lat=37.804363, lon=-122.271111):
 
-    layout['mapbox']['center']['lat'] = lat
-    layout['mapbox']['center']['lon'] = lon
+def GSV_map(map_data, pollutant, lat = 37.804363, lon = -122.271111):
+
+    GSV_layout = copy.deepcopy(layout)
+    GSV_layout['mapbox']['center']['lat'] = lat
+    GSV_layout['mapbox']['center']['lon'] = lon
 
     return {
         "data": [
@@ -64,26 +67,34 @@ def gen_map(map_data, lat=37.804363, lon=-122.271111):
                     "type": "scattermapbox",
                     "lat": list(map_data['Latitude']),
                     "lon": list(map_data['Longitude']),
-                    "text": list(map_data['NO2']),
+                    "text": list(pollutant),
                     "mode": "markers",
                     "marker": {
                         "size": 4,
                         "opacity": 0.8,
-                        "color": map_data['NO2']
+                        "color": pollutant
                     }
 
                 },
 
             ],
-        "layout": layout
+        "layout": GSV_layout
     }
 
-def gen_map_estimate(address_data, lat=37.804363, lon=-122.271111):
 
-    layout['mapbox']['center']['lat'] = lat
-    layout['mapbox']['center']['lon'] = lon
-    layout['mapbox']['zoom'] = 13
-    layout['title'] = 'Air quality estimate at your address'
+def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
+
+    address_layout = copy.deepcopy(layout)
+    address_layout['mapbox']['center']['lat'] = lat
+    address_layout['mapbox']['center']['lon'] = lon
+    address_layout['mapbox']['zoom'] = 13
+    address_layout['title'] = 'Air quality estimate at your address'
+
+    if pollutant.name == 'NO2':
+        heat_pollutant = heatmap['no2']
+    else:
+        heat_pollutant = heatmap['bc']
+
 
     return {
         "data": [
@@ -91,12 +102,12 @@ def gen_map_estimate(address_data, lat=37.804363, lon=-122.271111):
                     "type": "scattermapbox",
                     "lat": list(heatmap['Lat']),
                     "lon": list(heatmap['Long']),
-                    "text": list(heatmap['no2']),
+                    "text": list(heat_pollutant),
                     "mode": "markers",
                     "marker": {
                         "size": 60,
                         "opacity": 0.01,
-                        "color": heatmap['no2']
+                        "color": heat_pollutant
                     }
                 },
 
@@ -104,17 +115,17 @@ def gen_map_estimate(address_data, lat=37.804363, lon=-122.271111):
                     "type": "scattermapbox",
                     "lat": list(address_data['Latitude']),
                     "lon": list(address_data['Longitude']),
-                    "text": list(address_data['NO2']),
+                    "text": list(pollutant),
                     "mode": "markers",
                     "marker": {
                         "size": 20,
                         "opacity": 0.9,
-                        "color": address_data['NO2']
+                        "color": pollutant
                     }
                 }
 
             ],
-        "layout": layout
+        "layout": address_layout
     }
 
 
@@ -127,26 +138,41 @@ app.layout = html.Div(
     
         html.Div(
             [
+                html.Div(
+                    [
+                        dcc.Dropdown(
+                            options = [
+                                {'label': 'Nitrogen dioxide', 'value': 'no2'},
+                                {'label': 'Black carbon', 'value': 'bc'}
+                            ],
+                            value = 'no2',
+                            id = 'dropdown-pollutant'
+                        )
+                    ],
+                    className='five columns',
+                    style={'textAlign': 'center', 'fontSize': 20}
+                ),
+
                 dcc.Input(id='input-box', type='text'),
                 html.Button('Submit', id='button', style={'textAlign': 'center', 'fontSize': 18}),
                 
                 html.Div(id='output-container-button',
-                    children='Enter an address and press submit')
+                    children='Enter an address and press submit'),
             
             ], style={'textAlign': 'center', 'fontSize': 24}),
 
+
         html.Div(
             [
-                dcc.Graph(id='map_graph',
-                    figure = gen_map(GSV_df),
+                dcc.Graph(id='measurement_map',
                     style={'margin-top': '10'})
-            ], className = "six columns"),
+            ], className = "five columns"),
 
         html.Div(
             [
                 dcc.Graph(id='address_map',
                     style={'margin-top': '10'})
-            ], className = "five columns"),
+            ], className = "six columns"),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
     ]
@@ -256,8 +282,11 @@ def find_exposure(n_clicks, value):
     X = X.drop(['zone', 'road_type'], axis = 1)
 
     ## D. Run the model!!!
-    X['NO2'] = no2_model.predict(X)
-    #features_df['BC'] = bc_model.predict(X)
+    no2 = no2_model.predict(X)
+    bc = bc_model.predict(X)
+
+    X['NO2'] = no2
+    X['BC'] = bc
 
     # Add lat long columns for later plotting
     X['Latitude'] = features_df['Latitude']
@@ -267,32 +296,61 @@ def find_exposure(n_clicks, value):
     return X.to_json(orient='split')
 
 @app.callback(
-    dash.dependencies.Output('output-container-button', 'children'),
-    [dash.dependencies.Input('intermediate_value', 'children')])
+    Output('output-container-button', 'children'),
+    [Input('intermediate_value', 'children'),
+     Input('dropdown-pollutant', 'value')])
 
-def get_estimate(model_df):
+def get_estimate(model_df, pollutant):
 
     model_df = pd.read_json(model_df, orient='split')
-    
+
     median_NO2 = 9.4
     median_BC = 0.36
     NO2_diff = ((model_df.ix[0, 'NO2'] - median_NO2)/median_NO2) * 100
-    BC_diff = ((model_df.ix[0, 'NO2'] - median_BC)/median_BC) * 100
+    BC_diff = ((model_df.ix[0, 'BC'] - median_BC)/median_BC) * 100
 
-    if NO2_diff > 0:
-        return "You're NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1))
+    if pollutant == 'no2':
+        if NO2_diff > 0:
+            return "You're NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1))
+        else:
+            return "You're NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1)))
     else:
-        return "You're NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1)))
+        if BC_diff > 0:
+            return "You're black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1))
+        else:
+            return "You're black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1)))
+
 
 
 @app.callback(
-    dash.dependencies.Output('address_map', 'figure'),
-    [dash.dependencies.Input('intermediate_value', 'children')])
+    Output('measurement_map', 'figure'),
+    [Input('dropdown-pollutant', 'value')])
 
-def location_map(address_df):
+def measure_map(pollutant):
 
+    if pollutant == 'no2':
+        measurement_map = GSV_map(GSV_df, GSV_df['NO2'])
+    else:
+        measurement_map = GSV_map(GSV_df, GSV_df['BC'])
+
+    return measurement_map
+
+
+@app.callback(
+    Output('address_map', 'figure'),
+    [Input('intermediate_value', 'children'),
+     Input('dropdown-pollutant', 'value')])
+
+def location_map(address_df, pollutant):
     address_df = pd.read_json(address_df, orient='split')
-    address_map = gen_map_estimate(address_df, lat = address_df.ix[0, 'Latitude'], lon=address_df.ix[0, 'Longitude'])
+
+    if pollutant == 'no2':
+        address_map = map_estimate(address_df, address_df['NO2'],
+            lat = address_df.ix[0, 'Latitude'], lon=address_df.ix[0, 'Longitude'])
+    if pollutant == 'bc':
+        address_map = map_estimate(address_df, address_df['BC'],
+            lat = address_df.ix[0, 'Latitude'], lon=address_df.ix[0, 'Longitude'])
+    
     return address_map
 
 if __name__ == '__main__':
