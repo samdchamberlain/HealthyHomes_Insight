@@ -1,7 +1,6 @@
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-import osmnx as ox
 import matplotlib.pyplot as plt
 import seaborn as sns
 from shapely.geometry import Point, MultiPoint
@@ -60,3 +59,16 @@ def import_gpd(filename):
     data_gpd = gpd.GeoDataFrame(data, geometry = data['geometry'], crs={'init' :'epsg:4326'})
     data_gpd = data_gpd.drop(['Unnamed: 0'], axis = 1)
     return(data_gpd)
+
+
+def clean_roads(df):
+    # Cleaning road categories ...
+    df['road_type'] = df['road_type'].str.replace('_link', '')
+    df['road_type'] = np.where(df['road_type'] == 'trunk', 'secondary', df['road_type'])
+    df['road_type'] = np.where(df['road_type'] == 'living_street', 'residential', df['road_type'])
+    df['road_type'] = np.where(df['road_type'] == 'a', 'unclassified', df['road_type'])
+
+    # Drop all point not measured on a OpenStreetMap roadway
+    df = df[df.road_type != 'outside_area']
+
+    return(df)
