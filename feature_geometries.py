@@ -1,8 +1,6 @@
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from shapely.geometry import Point, MultiPoint
 from shapely.ops import nearest_points
 from shapely import wkt
