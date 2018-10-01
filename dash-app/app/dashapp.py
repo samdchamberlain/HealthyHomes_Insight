@@ -27,12 +27,14 @@ wsgi_app = app.wsgi_app
 # Connect dash to flask
 app = dash.Dash(__name__, server=app, url_base_pathname='/')
 
+
 # Import datasets for feature building
 all_roads = import_gpd('data/all_roads.csv')
 all_intersections = import_gpd('data/all_intersections.csv')
 all_zoning = import_gpd('data/east_zoning.csv')
 census_tracts = import_gpd('data/census_tracts.csv')
 heatmap = import_gpd('data/heatmap.csv')
+neighborhoods = import_gpd('data/neighborhood_summaries.csv')
 
 
 # Import EDF-GSV data for visualizations
@@ -67,6 +69,42 @@ layout = dict(
     )
 )
 
+def find_nearby_neighborhoods(location, neighborhoods, buffer_dist = 0.015):
+
+    neighborhood_index = neighborhoods.sindex
+    circle = location.buffer(buffer_dist) #build a km buffer around location
+    
+    possible_matches_index = list(neighborhood_index.intersection(circle.bounds)) #get index of possible neighborhoods
+    possible_matches = neighborhoods.iloc[possible_matches_index]
+    precise_matches = possible_matches[possible_matches.intersects(circle)].copy()
+
+    return precise_matches
+
+
+def get_healthy_suggestions(location, neighborhoods, price_range = 0.2, buffer_dist = 0.015):
+    
+    #find your current neighborhood...
+    current_hood = neighborhoods[neighborhoods.intersects(location)]
+    
+    #find all neighborhoods within a mile (0.015 deg buffer)
+    nearby_hoods = find_nearby_neighborhoods(location, neighborhoods)
+    
+    #subset neighborhoods in similar price bracket (default is +/- 20%)
+    upper = 1 + price_range
+    lower = 1 - price_range
+    similar_hoods = nearby_hoods[nearby_hoods.price.between(current_hood['price'].iloc[0]*lower, 
+                                                            current_hood['price'].iloc[0]*upper)]
+    
+    
+    #find which neighborhoods have lower exposures 
+    healthy_hoods = similar_hoods[similar_hoods.no2 < current_hood['no2'].iloc[0]]
+    
+    #how much lower are the exposure rates?
+    healthy_hoods['percent_diff'] = (1 - (healthy_hoods['no2']/current_hood['no2'].iloc[0]))*100
+    healthy_hoods['percent_diff'] = healthy_hoods['percent_diff'].round(1)
+    
+    return healthy_hoods
+    
 
 def GSV_map(map_data, pollutant, lat = 37.804363, lon = -122.271111):
 
@@ -172,6 +210,9 @@ app.layout = html.Div(
             
             ], style={'textAlign': 'center', 'fontSize': 24}),
 
+
+        html.Div(id='suggestions',
+        	children='', style={'textAlign': 'center', 'fontSize': 22}),
 
         html.Div(
             [
@@ -334,6 +375,22 @@ def get_estimate(model_df, pollutant):
         else:
             return "You're black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1)))
 
+
+@app.callback(
+	Output('suggestions', 'children'),
+	[Input('intermediate_value', 'children')])
+	
+def create_suggestions(model_df):
+	model_df = pd.read_json(model_df, orient='split')
+	geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+
+	healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
+
+	hoods_statement = str('The following neighborhoods are healthier choices within your budget: ' + str(healthy_hoods.sort_values(by = 'no2')['Name'].values))
+	values_statement = str('.  These neighborhoods have ' + str(healthy_hoods.sort_values(by = 'no2')['percent_diff'].values) + 
+		' percent lower exposure rates.')
+	
+	return(hoods_statement +  values_statement)
 
 
 @app.callback(
