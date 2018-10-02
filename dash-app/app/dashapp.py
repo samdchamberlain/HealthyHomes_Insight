@@ -81,7 +81,7 @@ def find_nearby_neighborhoods(location, neighborhoods, buffer_dist = 0.015):
     return precise_matches
 
 
-def get_healthy_suggestions(location, neighborhoods, price_range = 0.2, buffer_dist = 0.015):
+def get_healthy_suggestions(location, neighborhoods, price_range = 0.15, buffer_dist = 0.015):
     
     #find your current neighborhood...
     current_hood = neighborhoods[neighborhoods.intersects(location)]
@@ -100,8 +100,8 @@ def get_healthy_suggestions(location, neighborhoods, price_range = 0.2, buffer_d
     healthy_hoods = similar_hoods[similar_hoods.no2 < current_hood['no2'].iloc[0]]
     
     #how much lower are the exposure rates?
-    healthy_hoods['percent_diff'] = (1 - (healthy_hoods['no2']/current_hood['no2'].iloc[0]))*100
-    healthy_hoods['percent_diff'] = healthy_hoods['percent_diff'].round(1)
+    healthy_hoods['percent_diff'] = np.ceil((1 - (healthy_hoods['no2']/current_hood['no2'].iloc[0]))*100) # round up to be conservative
+    healthy_hoods['percent_diff'] = healthy_hoods['percent_diff'].astype(int)
     
     return healthy_hoods
     
@@ -206,13 +206,13 @@ app.layout = html.Div(
                 html.Button('Submit', id='button', style={'textAlign': 'center', 'fontSize': 18}),
                 
                 html.Div(id='output-container-button',
-                    children='Enter an address and press submit'),
+                    children='Enter an address and press submit', style={'margin-top': '10'}),
             
             ], style={'textAlign': 'center', 'fontSize': 24}),
 
 
         html.Div(id='suggestions',
-        	children='', style={'textAlign': 'center', 'fontSize': 22}),
+        	children='', style={'textAlign': 'center', 'fontSize': 22, 'margin-top': '25'}),
 
         html.Div(
             [
@@ -359,39 +359,42 @@ def get_estimate(model_df, pollutant):
 
     model_df = pd.read_json(model_df, orient='split')
 
-    median_NO2 = 9.4
-    median_BC = 0.36
+    median_NO2 = 13.6
+    median_BC = 0.45
     NO2_diff = ((model_df.ix[0, 'NO2'] - median_NO2)/median_NO2) * 100
     BC_diff = ((model_df.ix[0, 'BC'] - median_BC)/median_BC) * 100
 
     if pollutant == 'no2':
         if NO2_diff > 0:
-            return "You're NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1))
+            return "Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1))
         else:
-            return "You're NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1)))
+            return "Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1)))
     else:
         if BC_diff > 0:
-            return "You're black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1))
+            return "Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1))
         else:
-            return "You're black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1)))
+            return "Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1)))
 
 
 @app.callback(
 	Output('suggestions', 'children'),
 	[Input('intermediate_value', 'children')])
-	
+
 def create_suggestions(model_df):
-	model_df = pd.read_json(model_df, orient='split')
-	geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+    model_df = pd.read_json(model_df, orient='split')
+    geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+    
+    healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
 
-	healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
+    hoods_statement = str("The following neighborhoods are healthier choices within your budget: " + 
+        ", ".join(healthy_hoods.sort_values(by = 'no2')['Name'].values))
+    values_statement = str('.  These neighborhoods have ' + 
+        ", ".join(healthy_hoods.sort_values(by = 'no2')['percent_diff'].astype(str)) + ' percent lower exposure rates.')
 
-	hoods_statement = str('The following neighborhoods are healthier choices within your budget: ' + str(healthy_hoods.sort_values(by = 'no2')['Name'].values))
-	values_statement = str('.  These neighborhoods have ' + str(healthy_hoods.sort_values(by = 'no2')['percent_diff'].values) + 
-		' percent lower exposure rates.')
-	
-	return(hoods_statement +  values_statement)
-
+    if healthy_hoods.shape[0] == 0:
+        return 'There are no healthier neighborhoods nearby in your budget (within 1 mile).'
+    else:
+        return(hoods_statement + values_statement)
 
 @app.callback(
     Output('measurement_map', 'figure'),
