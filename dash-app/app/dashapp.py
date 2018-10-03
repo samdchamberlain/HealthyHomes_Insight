@@ -27,7 +27,6 @@ wsgi_app = app.wsgi_app
 # Connect dash to flask
 app = dash.Dash(__name__, server=app, url_base_pathname='/')
 
-
 # Import datasets for feature building
 all_roads = import_gpd('data/all_roads.csv')
 all_intersections = import_gpd('data/all_intersections.csv')
@@ -35,6 +34,7 @@ all_zoning = import_gpd('data/east_zoning.csv')
 census_tracts = import_gpd('data/census_tracts.csv')
 heatmap = import_gpd('data/heatmap.csv')
 neighborhoods = import_gpd('data/neighborhood_summaries.csv')
+region = import_gpd('data/region.csv')
 
 
 # Import EDF-GSV data for visualizations
@@ -155,6 +155,7 @@ def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
                     "lon": list(heatmap['Long']),
                     "text": list(heat_pollutant),
                     "mode": "markers",
+                    #"showlegend": False,
                     "marker": {
                         "size": 60,
                         "opacity": 0.01,
@@ -168,6 +169,7 @@ def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
                     "lon": list(address_data['Longitude']),
                     "text": list(pollutant),
                     "mode": "markers",
+                    #"showlegend": False,
                     "marker": {
                         "size": 20,
                         "opacity": 0.9,
@@ -183,7 +185,7 @@ app.css.append_css({'external_url': 'https://cdn.rawgit.com/plotly/dash-app-styl
 
 app.layout = html.Div(
     [
-        html.H1("How's the air quality at your home?", style={'textAlign': 'center'}),
+        html.H1("How's the air quality at your East Bay home?", style={'textAlign': 'center'}),
     
         html.Div(
             [
@@ -202,7 +204,7 @@ app.layout = html.Div(
                     style={'textAlign': 'center', 'fontSize': 20}
                 ),
 
-                dcc.Input(id='input-box', type='text'),
+                dcc.Input(id='input-box', type='text', value='4000 Telegraph Ave, Oakland'),
                 html.Button('Submit', id='button', style={'textAlign': 'center', 'fontSize': 18}),
                 
                 html.Div(id='output-container-button',
@@ -243,7 +245,7 @@ def find_exposure(n_clicks, value):
     geolocator = GoogleV3(api_key='AIzaSyBZLOJfP1yw-F5T26O_nNcjXpceL6KrD3Q')
     location = geolocator.geocode(address) # contains full address and lat long data
     geolocation = Point(location[1][1], location[1][0])
-
+    
     ## B. Calculate features
     # Re-project in utm to calculate distances to input point below
     highway_utm = all_roads[all_roads.highway == 'motorway'].to_crs({'init': 'epsg:32610'}).copy()
@@ -358,22 +360,36 @@ def find_exposure(n_clicks, value):
 def get_estimate(model_df, pollutant):
 
     model_df = pd.read_json(model_df, orient='split')
+    geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
 
-    median_NO2 = 13.6
-    median_BC = 0.45
+    median_NO2 = 13
+    median_BC = 0.4
     NO2_diff = ((model_df.ix[0, 'NO2'] - median_NO2)/median_NO2) * 100
     BC_diff = ((model_df.ix[0, 'BC'] - median_BC)/median_BC) * 100
 
+    if geolocation.within(region.geometry[0]) == False:
+    	return 'Your query is out of range. Please limit to Oakland, Berkeley, Emeryville, Albany, or El Cerrito.'
+
+
+    if median_NO2 < model_df.ix[0, 'NO2'] < (median_NO2 + 5):
+    	alarm = 'moderate'
+    else:
+    	alarm = 'HIGH'
+
     if pollutant == 'no2':
         if NO2_diff > 0:
-            return "Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1))
+            return("Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1)) +
+            	" You are at {} health risk.".format(alarm))
         else:
-            return "Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1)))
+            return("Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))) +
+            	" You are at no elevated health risk.")
     else:
         if BC_diff > 0:
-            return "Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1))
+            return("Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1)) +
+            	" You are at {} health risk.".format(alarm))
         else:
-            return "Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1)))
+            return("Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1))) +
+            	" You are at no elevated health risk.")
 
 
 @app.callback(
@@ -428,7 +444,6 @@ def location_map(address_df, pollutant):
     return address_map
 
 if __name__ == '__main__':
-    #app.run_server(debug=False, host="0.0.0.0")
     no2_model = joblib.load("models/xgb_no2.pkl")
     bc_model = joblib.load("models/xgb_bc.pkl")
     app.run_server(debug=True)
