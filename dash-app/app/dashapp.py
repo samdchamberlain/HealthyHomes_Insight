@@ -16,10 +16,6 @@ from feature_geometries import *
 
 from app import app
 
-# Test
-@app.route('/index')
-def sayHi():
-    return "Hi from my Flask App!"
 
 # Define for IIS module registration.
 wsgi_app = app.wsgi_app
@@ -44,9 +40,9 @@ GSV_df = import_gpd('data/GSV_all.csv')
 # Mapping layout
 layout = dict(
     autosize=True,
-    height=670,
+    height=800,
     font=dict(color='#fffcfc'),
-    titlefont=dict(color='#fffcfc', size='16'),
+    titlefont=dict(color='#fffcfc', size='18'),
     margin=dict(
         l=35,
         r=35,
@@ -56,8 +52,8 @@ layout = dict(
     hovermode="closest",
     plot_bgcolor="#191A1A",
     paper_bgcolor="#020202",
-    legend=dict(font=dict(size=10), orientation='h'),
-    title='Hover to observe measured pollutant concentrations',
+    legend=dict(font=dict(size=16), orientation='h'),
+    title='Air quality at your address and neighborhood',
     mapbox=dict(
         accesstoken=mapbox_access_token,
         style="dark",
@@ -65,7 +61,7 @@ layout = dict(
             lon=-122.271111,
             lat=37.804363
         ),
-        zoom=12,
+        zoom=13,
     )
 )
 
@@ -104,42 +100,13 @@ def get_healthy_suggestions(location, neighborhoods, price_range = 0.15, buffer_
     healthy_hoods['percent_diff'] = healthy_hoods['percent_diff'].astype(int)
     
     return healthy_hoods
-    
-
-def GSV_map(map_data, pollutant, lat = 37.804363, lon = -122.271111):
-
-    GSV_layout = copy.deepcopy(layout)
-    GSV_layout['mapbox']['center']['lat'] = lat
-    GSV_layout['mapbox']['center']['lon'] = lon
-
-    return {
-        "data": [
-                {
-                    "type": "scattermapbox",
-                    "lat": list(map_data['Latitude']),
-                    "lon": list(map_data['Longitude']),
-                    "text": list(pollutant),
-                    "mode": "markers",
-                    "marker": {
-                        "size": 4,
-                        "opacity": 0.8,
-                        "color": pollutant
-                    }
-
-                },
-
-            ],
-        "layout": GSV_layout
-    }
 
 
-def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
+def map_estimate(address_data, pollutant, lat, lon):
 
     address_layout = copy.deepcopy(layout)
     address_layout['mapbox']['center']['lat'] = lat
     address_layout['mapbox']['center']['lon'] = lon
-    address_layout['mapbox']['zoom'] = 13
-    address_layout['title'] = 'Air quality estimate at your address'
 
     if pollutant.name == 'NO2':
         heat_pollutant = heatmap['no2']
@@ -155,7 +122,7 @@ def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
                     "lon": list(heatmap['Long']),
                     "text": list(heat_pollutant),
                     "mode": "markers",
-                    #"showlegend": False,
+                    "name": "Neighborhood",
                     "marker": {
                         "size": 60,
                         "opacity": 0.01,
@@ -169,7 +136,7 @@ def map_estimate(address_data, pollutant, lat = 37.804363, lon = -122.271111):
                     "lon": list(address_data['Longitude']),
                     "text": list(pollutant),
                     "mode": "markers",
-                    #"showlegend": False,
+                    "name": "Address",
                     "marker": {
                         "size": 20,
                         "opacity": 0.9,
@@ -206,27 +173,24 @@ app.layout = html.Div(
 
                 dcc.Input(id='input-box', type='text', value='4000 Telegraph Ave, Oakland'),
                 html.Button('Submit', id='button', style={'textAlign': 'center', 'fontSize': 18}),
-                
-                html.Div(id='output-container-button',
-                    children='Enter an address and press submit', style={'margin-top': '10'}),
             
             ], style={'textAlign': 'center', 'fontSize': 24}),
 
-
-        html.Div(id='suggestions',
-        	children='', style={'textAlign': 'center', 'fontSize': 22, 'margin-top': '25'}),
-
-        html.Div(
-            [
-                dcc.Graph(id='measurement_map',
-                    style={'margin-top': '10'})
-            ], className = "five columns"),
 
         html.Div(
             [
                 dcc.Graph(id='address_map',
                     style={'margin-top': '10'})
-            ], className = "six columns"),
+            ], className = "six columns"
+        ),
+
+        dcc.Markdown(id='output-container-button', 
+            children='Enter an address and press submit', 
+            className = "five columns"),
+
+        html.Div(id='suggestions', children='',
+            style={'textAlign': 'center', 'fontSize': 22, 'margin-top': '25'}, 
+            className = "five columns"),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
     ]
@@ -367,29 +331,29 @@ def get_estimate(model_df, pollutant):
     NO2_diff = ((model_df.ix[0, 'NO2'] - median_NO2)/median_NO2) * 100
     BC_diff = ((model_df.ix[0, 'BC'] - median_BC)/median_BC) * 100
 
-    if geolocation.within(region.geometry[0]) == False:
-    	return 'Your query is out of range. Please limit to Oakland, Berkeley, Emeryville, Albany, or El Cerrito.'
+    # if geolocation.within(region.geometry[0]) == False:
+    return '''**Your query is out of range. Please limit to Oakland, Berkeley, Emeryville, Albany, or El Cerrito.**'''
 
 
-    if median_NO2 < model_df.ix[0, 'NO2'] < (median_NO2 + 5):
-    	alarm = 'moderate'
-    else:
-    	alarm = 'HIGH'
+    # if median_NO2 < model_df.ix[0, 'NO2'] < (median_NO2 + 5):
+    # 	alarm = 'moderate'
+    # else:
+    # 	alarm = 'HIGH'
 
-    if pollutant == 'no2':
-        if NO2_diff > 0:
-            return("Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1)) +
-            	" You are at {} health risk.".format(alarm))
-        else:
-            return("Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))) +
-            	" You are at no elevated health risk.")
-    else:
-        if BC_diff > 0:
-            return("Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1)) +
-            	" You are at {} health risk.".format(alarm))
-        else:
-            return("Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1))) +
-            	" You are at no elevated health risk.")
+    # if pollutant == 'no2':
+    #     if NO2_diff > 0:
+    #         return("Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1)) +
+    #         	" You are at {} health risk.".format(alarm))
+    #     else:
+    #         return("Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))) +
+    #         	" You are at no elevated health risk.")
+    # else:
+    #     if BC_diff > 0:
+    #         return("Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1)) +
+    #         	" You are at {} health risk.".format(alarm))
+    #     else:
+    #         return("Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1))) +
+    #         	" You are at no elevated health risk.")
 
 
 @app.callback(
@@ -411,19 +375,6 @@ def create_suggestions(model_df):
         return 'There are no healthier neighborhoods nearby in your budget (within 1 mile).'
     else:
         return(hoods_statement + values_statement)
-
-@app.callback(
-    Output('measurement_map', 'figure'),
-    [Input('dropdown-pollutant', 'value')])
-
-def measure_map(pollutant):
-
-    if pollutant == 'no2':
-        measurement_map = GSV_map(GSV_df, GSV_df['NO2'])
-    else:
-        measurement_map = GSV_map(GSV_df, GSV_df['BC'])
-
-    return measurement_map
 
 
 @app.callback(
