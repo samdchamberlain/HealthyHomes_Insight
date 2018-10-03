@@ -167,7 +167,7 @@ app.layout = html.Div(
                             id = 'dropdown-pollutant'
                         )
                     ],
-                    className='five columns',
+                    className='six columns',
                     style={'textAlign': 'center', 'fontSize': 20}
                 ),
 
@@ -184,12 +184,13 @@ app.layout = html.Div(
             ], className = "six columns"
         ),
 
-        dcc.Markdown(id='output-container-button', 
-            children='Enter an address and press submit', 
-            className = "five columns"),
+        html.Div(id='output-container-button', children='',
+            style={'textAlign': 'center', 'fontSize': 40, 'margin-top': '65'}, 
+            className = "five columns"
+        ),
 
         html.Div(id='suggestions', children='',
-            style={'textAlign': 'center', 'fontSize': 22, 'margin-top': '25'}, 
+            style={'textAlign': 'center', 'fontSize': 34, 'margin-top': '50'}, 
             className = "five columns"),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
@@ -331,29 +332,29 @@ def get_estimate(model_df, pollutant):
     NO2_diff = ((model_df.ix[0, 'NO2'] - median_NO2)/median_NO2) * 100
     BC_diff = ((model_df.ix[0, 'BC'] - median_BC)/median_BC) * 100
 
-    # if geolocation.within(region.geometry[0]) == False:
-    return '''**Your query is out of range. Please limit to Oakland, Berkeley, Emeryville, Albany, or El Cerrito.**'''
+    if geolocation.within(region.geometry[0]) == False:
+        return "Your query is out of range. Please limit to Oakland, Berkeley, Emeryville, Albany, or El Cerrito."
 
 
-    # if median_NO2 < model_df.ix[0, 'NO2'] < (median_NO2 + 5):
-    # 	alarm = 'moderate'
-    # else:
-    # 	alarm = 'HIGH'
+    if median_NO2 < model_df.ix[0, 'NO2'] < (median_NO2 + 5):
+    	alarm = 'moderate'
+    else:
+    	alarm = 'HIGH'
 
-    # if pollutant == 'no2':
-    #     if NO2_diff > 0:
-    #         return("Your NOx exposure is {}% above than the regional average.".format(np.round(NO2_diff, 1)) +
-    #         	" You are at {} health risk.".format(alarm))
-    #     else:
-    #         return("Your NOx exposure is {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))) +
-    #         	" You are at no elevated health risk.")
-    # else:
-    #     if BC_diff > 0:
-    #         return("Your black carbon exposure is {}% above than the regional average.".format(np.round(BC_diff, 1)) +
-    #         	" You are at {} health risk.".format(alarm))
-    #     else:
-    #         return("Your black carbon exposure is {}% below than the regional average.".format(abs(np.round(BC_diff, 1))) +
-    #         	" You are at no elevated health risk.")
+    if pollutant == 'no2':
+        if NO2_diff > 0:
+            return("Health risk is {} at this location.".format(alarm) + 
+                " Exposures are {}% above average.".format(np.round(NO2_diff, 1)))
+        else:
+            return("You are at no elevated health risk." + 
+                " Exposures are {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))))
+    else:
+        if BC_diff > 0:
+            return("Health risk is {} at this location.".format(alarm) +
+                " Exposures are {}% above average".format(np.round(BC_diff, 1)))
+        else:
+            return("You are at no elevated health risk." + 
+                " Exposures are {}% below than the regional average.".format(abs(np.round(BC_diff, 1))))
 
 
 @app.callback(
@@ -368,13 +369,13 @@ def create_suggestions(model_df):
 
     hoods_statement = str("The following neighborhoods are healthier choices within your budget: " + 
         ", ".join(healthy_hoods.sort_values(by = 'no2')['Name'].values))
-    values_statement = str('.  These neighborhoods have ' + 
-        ", ".join(healthy_hoods.sort_values(by = 'no2')['percent_diff'].astype(str)) + ' percent lower exposure rates.')
+    # values_statement = str('.  These neighborhoods have ' + 
+    #     ", ".join(healthy_hoods.sort_values(by = 'no2')['percent_diff'].astype(str)) + ' percent lower exposure rates.')
 
     if healthy_hoods.shape[0] == 0:
         return 'There are no healthier neighborhoods nearby in your budget (within 1 mile).'
     else:
-        return(hoods_statement + values_statement)
+        return(hoods_statement)
 
 
 @app.callback(
