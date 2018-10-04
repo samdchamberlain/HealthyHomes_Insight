@@ -2,6 +2,7 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_table_experiments as dt
 from dash.dependencies import Input, Output
 from sklearn.externals import joblib
 import copy
@@ -64,6 +65,7 @@ layout = dict(
         zoom=13,
     )
 )
+
 
 def find_nearby_neighborhoods(location, neighborhoods, buffer_dist = 0.015):
 
@@ -149,7 +151,6 @@ def map_estimate(address_data, pollutant, lat, lon):
     }
 
 app.css.append_css({'external_url': 'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})  # noqa: E501
-
 app.layout = html.Div(
     [
         html.H1("How's the air quality at your East Bay home?", style={'textAlign': 'center'}),
@@ -184,14 +185,28 @@ app.layout = html.Div(
             ], className = "six columns"
         ),
 
-        html.Div(id='output-container-button', children='',
-            style={'textAlign': 'center', 'fontSize': 40, 'margin-top': '65'}, 
-            className = "five columns"
+        html.Div(
+        	[
+        		dcc.Markdown(id='output-container-button')
+        	], style={'textAlign': 'center', 'fontSize': 36, 'margin-top': '65'}, className = 'five columns'
         ),
 
         html.Div(id='suggestions', children='',
-            style={'textAlign': 'center', 'fontSize': 34, 'margin-top': '50'}, 
+            style={'textAlign': 'center', 'margin-top': '50'}, 
             className = "five columns"),
+
+        # html.Div(id='container'),
+
+        #html.Div(id='datatable', children=''),
+
+        # dt.DataTable(
+        #     rows=[{}], # initialise the rows
+        #     row_selectable=True,
+        #     filterable=True,
+        #     sortable=True,
+        #     selected_row_indices=[],
+        #     id='datatable'
+        # ),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
     ]
@@ -343,18 +358,18 @@ def get_estimate(model_df, pollutant):
 
     if pollutant == 'no2':
         if NO2_diff > 0:
-            return("Health risk is {} at this location.".format(alarm) + 
-                " Exposures are {}% above average.".format(np.round(NO2_diff, 1)))
+            return('''Health risk is **{0}** at this location. 
+            	Exposures are {1}% above average.'''.format(alarm, np.round(NO2_diff, 1)))
         else:
-            return("You are at no elevated health risk." + 
-                " Exposures are {}% below than the regional average.".format(abs(np.round(NO2_diff, 1))))
+            return('''You are at no elevated health risk. 
+            	Exposures are {0}% below than the regional average.'''.format(abs(np.round(NO2_diff, 1))))
     else:
         if BC_diff > 0:
-            return("Health risk is {} at this location.".format(alarm) +
-                " Exposures are {}% above average".format(np.round(BC_diff, 1)))
+            return('''Health risk is **{0}** at this location. 
+            	Exposures are {1}% above average.'''.format(alarm, np.round(BC_diff, 1)))
         else:
-            return("You are at no elevated health risk." + 
-                " Exposures are {}% below than the regional average.".format(abs(np.round(BC_diff, 1))))
+            return('''You are at no elevated health risk. 
+            	Exposures are {0}% below than the regional average.'''.format(abs(np.round(BC_diff, 1))))
 
 
 @app.callback(
@@ -367,15 +382,51 @@ def create_suggestions(model_df):
     
     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
 
-    hoods_statement = str("The following neighborhoods are healthier choices within your budget: " + 
+    hoods_statement = str("The following neighborhoods are healthier choices within your budget (healthiest alternative ranked first): " + 
         ", ".join(healthy_hoods.sort_values(by = 'no2')['Name'].values))
     # values_statement = str('.  These neighborhoods have ' + 
     #     ", ".join(healthy_hoods.sort_values(by = 'no2')['percent_diff'].astype(str)) + ' percent lower exposure rates.')
+
+    hoods_statement = html.Div([
+    						html.P("The following neighborhoods are healthier choices within your budget:", 
+    							style = {'fontSize': 32}),
+    						html.P("(healthiest alternative ranked first)",
+    							style = {'fontSize': 24}),
+    						html.P(", ".join(healthy_hoods.sort_values(by = 'no2')['Name'].values),
+    							style = {'fontSize': 32, 'fontStyle': 'bold'})
+    						])
 
     if healthy_hoods.shape[0] == 0:
         return 'There are no healthier neighborhoods nearby in your budget (within 1 mile).'
     else:
         return(hoods_statement)
+
+# @app.callback(
+#     Output('datatable', 'children'),
+#     [Input('intermediate_value', 'children')])
+
+# # def create_table(model_df):
+# #     model_df = pd.read_json(model_df, orient='split')
+# #     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+    
+# #     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
+# #     return pd.DataFrame(healthy_hoods).to_dict('records')
+
+# def generate_table(model_df, max_rows=10):
+
+#     model_df = pd.read_json(model_df, orient='split')
+#     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+#     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
+
+#     return html.Table(
+#         # Header
+#         [html.Tr([html.Th(col) for col in healthy_hoods.columns])] +
+
+#         # Body
+#         [html.Tr([
+#             html.Td(healthy_hoods.iloc[i][col]) for col in healthy_hoods.columns
+#         ]) for i in range(min(len(healthy_hoods), max_rows))]
+#     )
 
 
 @app.callback(
