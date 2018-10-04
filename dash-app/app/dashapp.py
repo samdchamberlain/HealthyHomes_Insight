@@ -153,7 +153,7 @@ def map_estimate(address_data, pollutant, lat, lon):
 app.css.append_css({'external_url': 'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})  # noqa: E501
 app.layout = html.Div(
     [
-        html.H1("How's the air quality at your East Bay home?", style={'textAlign': 'center'}),
+        html.H1("Check the air quality at your East Bay home", style={'textAlign': 'center'}),
     
         html.Div(
             [
@@ -195,18 +195,13 @@ app.layout = html.Div(
             style={'textAlign': 'center', 'margin-top': '50'}, 
             className = "five columns"),
 
-        # html.Div(id='container'),
-
-        #html.Div(id='datatable', children=''),
-
-        # dt.DataTable(
-        #     rows=[{}], # initialise the rows
-        #     row_selectable=True,
-        #     filterable=True,
-        #     sortable=True,
-        #     selected_row_indices=[],
-        #     id='datatable'
-        # ),
+        html.Div(
+            [
+                dt.DataTable(
+                rows=[{}], # initialise the rows
+                id='datatable'
+                )   
+            ], style={'textAlign': 'center', 'margin-top': '25', 'fontSize': 18}, className = "five columns"),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
     ]
@@ -401,32 +396,23 @@ def create_suggestions(model_df):
     else:
         return(hoods_statement)
 
-# @app.callback(
-#     Output('datatable', 'children'),
-#     [Input('intermediate_value', 'children')])
+@app.callback(
+    Output('datatable', 'rows'),
+    [Input('intermediate_value', 'children')])
 
-# # def create_table(model_df):
-# #     model_df = pd.read_json(model_df, orient='split')
-# #     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+def create_table(model_df):
+    model_df = pd.read_json(model_df, orient='split')
+    geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
     
-# #     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
-# #     return pd.DataFrame(healthy_hoods).to_dict('records')
+    healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
+    
+    healthy_hoods = pd.DataFrame(healthy_hoods)
+    healthy_hoods = healthy_hoods[['Name', 'price', 'percent_diff']]
+    healthy_hoods = healthy_hoods.rename(columns={'Name': 'Neighborhood', 'price': 'Rent', 'percent_diff': 'Reduction (%)'})
+    healthy_hoods = healthy_hoods.sort_values(['Reduction (%)'], ascending=False)
+    healthy_hoods = healthy_hoods.round(0)
 
-# def generate_table(model_df, max_rows=10):
-
-#     model_df = pd.read_json(model_df, orient='split')
-#     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
-#     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
-
-#     return html.Table(
-#         # Header
-#         [html.Tr([html.Th(col) for col in healthy_hoods.columns])] +
-
-#         # Body
-#         [html.Tr([
-#             html.Td(healthy_hoods.iloc[i][col]) for col in healthy_hoods.columns
-#         ]) for i in range(min(len(healthy_hoods), max_rows))]
-#     )
+    return healthy_hoods.to_dict('records')
 
 
 @app.callback(
