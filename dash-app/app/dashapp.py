@@ -188,11 +188,12 @@ app.layout = html.Div(
         html.Div(
         	[
         		dcc.Markdown(id='output-container-button')
-        	], style={'textAlign': 'center', 'fontSize': 36, 'margin-top': '65'}, className = 'five columns'
+        	], style={'textAlign': 'center', 'fontSize': 36, 'margin-top': '65', 'margin-left': '30'}, 
+        	className = 'five columns'
         ),
 
         html.Div(id='suggestions', children='',
-            style={'textAlign': 'center', 'margin-top': '50'}, 
+            style={'textAlign': 'center', 'margin-top': '50', 'margin-left': '30'}, 
             className = "five columns"),
 
         html.Div(
@@ -201,7 +202,8 @@ app.layout = html.Div(
                 rows=[{}], # initialise the rows
                 id='datatable'
                 )   
-            ], style={'textAlign': 'center', 'margin-top': '25', 'fontSize': 18}, className = "five columns"),
+            ], style={'textAlign': 'center', 'margin-top': '25', 'margin-left': '30', 'fontSize': 18}, 
+            className = "five columns"),
 
         html.Div(id='intermediate_value', style={'display': 'none'})
     ]
@@ -374,15 +376,17 @@ def get_estimate(model_df, pollutant):
 def create_suggestions(model_df):
     model_df = pd.read_json(model_df, orient='split')
     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+
+    if neighborhoods[neighborhoods.intersects(geolocation)].shape[0] == 0:
+        out_of_bounds = html.Div([
+                            html.P("Neighborhood recommendations only available for Oakland.", style = {'fontSize': 32})
+                            ])
+        return out_of_bounds
     
     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
 
-    hoods_statement = str("The following neighborhoods are healthier choices within your budget (healthiest alternative ranked first): " + 
-        ", ".join(healthy_hoods.sort_values(by = 'no2')['Name'].values))
-    # values_statement = str('.  These neighborhoods have ' + 
-    #     ", ".join(healthy_hoods.sort_values(by = 'no2')['percent_diff'].astype(str)) + ' percent lower exposure rates.')
-
-    hoods_statement = html.Div([
+    if healthy_hoods.shape[0] != 0:
+        hoods_statement = html.Div([
     						html.P("The following neighborhoods are healthier choices within your budget:", 
     							style = {'fontSize': 32}),
     						html.P("(healthiest alternative ranked first)",
@@ -391,10 +395,14 @@ def create_suggestions(model_df):
     							style = {'fontSize': 32, 'fontStyle': 'bold'})
     						])
 
-    if healthy_hoods.shape[0] == 0:
-        return 'There are no healthier neighborhoods nearby in your budget (within 1 mile).'
     else:
-        return(hoods_statement)
+        hoods_statement = html.Div([
+                            html.P("There are no healthier neighborhoods nearby in your budget (within 1 mile).",
+                                style = {'fontSize': 32})
+                            ])
+
+    return hoods_statement
+
 
 @app.callback(
     Output('datatable', 'rows'),
@@ -403,13 +411,16 @@ def create_suggestions(model_df):
 def create_table(model_df):
     model_df = pd.read_json(model_df, orient='split')
     geolocation = Point(model_df['Longitude'].iloc[0], model_df['Latitude'].iloc[0])
+
+    if neighborhoods[neighborhoods.intersects(geolocation)].shape[0] == 0:
+        return('')
     
     healthy_hoods = get_healthy_suggestions(geolocation, neighborhoods)
     
     healthy_hoods = pd.DataFrame(healthy_hoods)
     healthy_hoods = healthy_hoods[['Name', 'price', 'percent_diff']]
-    healthy_hoods = healthy_hoods.rename(columns={'Name': 'Neighborhood', 'price': 'Rent', 'percent_diff': 'Reduction (%)'})
-    healthy_hoods = healthy_hoods.sort_values(['Reduction (%)'], ascending=False)
+    healthy_hoods = healthy_hoods.rename(columns={'Name': 'Neighborhood', 'price': 'Average Rent', 'percent_diff': 'Pollution Reduction (%)'})
+    healthy_hoods = healthy_hoods.sort_values(['Pollution Reduction (%)'], ascending=False)
     healthy_hoods = healthy_hoods.round(0)
 
     return healthy_hoods.to_dict('records')
@@ -433,6 +444,6 @@ def location_map(address_df, pollutant):
     return address_map
 
 if __name__ == '__main__':
-    no2_model = joblib.load("models/xgb_no2.pkl")
-    bc_model = joblib.load("models/xgb_bc.pkl")
+    no2_model = joblib.load("models/rf_no2.pkl")
+    bc_model = joblib.load("models/rf_bc.pkl")
     app.run_server(debug=True)
