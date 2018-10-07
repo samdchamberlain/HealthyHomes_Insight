@@ -22,5 +22,4 @@ This repository contains all of the underlying data, notebooks used for data pro
 	* [feature_geometries.py](feature_geometries.py) - All functions used for feature engineerings, includes distance based metrics (ex. distance from highway) and finding nearest roadtypes for example.
 2. [imports](https://github.com/samdchamberlain/HealthyHomes_Insight/tree/master/Import%20notebooks) - Jupyter notebooks used for importing census data from API and aggregating global temperature and wind raster files. (FIX DEAD LINK)
 3.  [dash-app](https://github.com/samdchamberlain/HealthyHomes_Insight/tree/master/dash-app) - All scripts and data required for creating the web-app. More description of the web-app can be found within its README
-
-The full data is not uploaded to Github due to file sizes that exceed those allowed by GitHub; however, the original GSV data and heatmap output can be found within the [data] folder.
+4. [data](https://github.com/samdchamberlain/HealthyHomes_Insight/tree/master/data) - The full data is not uploaded to Github due to file sizes that exceed those allowed by GitHub; however, the original GSV data ('EDF_data.csv'), feature engineered GSV data ('GSV_all.csv'), heatmap model output ('heatmap.csv'), and neighborhood rents and pollution estimates ('neighborhood_summaries.csv') can be found here.
