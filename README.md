@@ -2,8 +2,12 @@
 Predicting traffic-related pollutant exposures in the East Bay, CA. This map-based web app predicts exposures to NO<sub>2</sub> and black carbon at individual addresses, while also providing health risk assessments and alternative, healthier neighborhoods within ones price range. [The web-app can be found here](http://healthyhomes.site/)
 
 ## Overview
-This project leverages a dataset of hyperlocal air pollution mapping collected by Google Street View (GSV) and the Environmental Defense Fund [link](https://www.edf.org/airqualitymaps) to generate address-level estimates of pollutant exposures at homes throughout the East Bay. Currently, the model and web-app is designed to estimate exposures at addresses in Oakland, Emeryville, Berkeley, Albany, and El Cerrito, California. The basic workflow that generates the [web-app](http://healthyhomes.site/) are as follows:
-* Features are generated for the location-based GSV data, as the original dataset is simply location information and gas concentrations.
+This project leverages a dataset of hyperlocal air pollution mapping collected by Google Street View (GSV) and the Environmental Defense Fund ([link])(https://www.edf.org/airqualitymaps) to generate address-level estimates of pollutant exposures at homes throughout the East Bay. Currently, the model and web-app is designed to estimate exposures at addresses in Oakland, Emeryville, Berkeley, Albany, and El Cerrito, California. The basic workflow that generates the [web-app](http://healthyhomes.site/) are as follows:
+* Features are generated for the location-based GSV data, as the original dataset is simply location information and gas concentrations. Additional data sources used for feature engineering include:
+	1. [OpenStreetMaps](https://www.openstreetmap.org/)
+	2. [US Census](https://factfinder.census.gov/faces/nav/jsf/pages/index.xhtml)
+	3. [City zoning](http://opendata.mtc.ca.gov/)
+	4. [Weather rasters (1 km)](http://worldclim.org/version2)
 * Machine learning models are trained on the GSV data w/ features (20 total), and random forests were applied in production on the web-app.
 * The underlying heatmap is generated for a point grid across all cities in the East Bay following the same procedure of feature engineering as above.
 * All current rental data for Oakland is scraped from Zillow to find neighborhoods within your price range with healthier air quality.
