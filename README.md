@@ -1,7 +1,7 @@
 # HealthyHomes
 Predicting traffic-related pollutant exposures in the East Bay, CA. This map-based web app predicts exposures to NO<sub>2</sub> and black carbon at individual addresses, while also providing health risk assessments and alternative, healthier neighborhoods within ones price range. [The web-app can be found here](http://healthyhomes.site/)
 
-<img src="graphs/NO2_heatmap.png" height="250">
+<img src="graphs/NO2_heatmap.png" height="1000">
 
 ## Overview
 This project leverages a dataset of hyperlocal air pollution mapping collected by Google Street View (GSV) and the Environmental Defense Fund ([link])(https://www.edf.org/airqualitymaps) to generate address-level estimates of pollutant exposures at homes throughout the East Bay. Currently, the model and web-app is designed to estimate exposures at addresses in Oakland, Emeryville, Berkeley, Albany, and El Cerrito, California. The basic workflow that generates the [web-app](http://healthyhomes.site/) are as follows:
