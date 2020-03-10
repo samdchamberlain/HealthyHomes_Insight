@@ -1,5 +1,5 @@
 # HealthyHomes
-Predicting traffic-related pollutant exposures in the East Bay, CA. This map-based web app predicts exposures to NO<sub>2</sub> and black carbon at individual addresses, while also providing health risk assessments and alternative, healthier neighborhoods within ones price range. 
+Predicting traffic-related pollutant exposures in the East Bay, CA. This map-based web app predicts exposures to NO<sub>2</sub> and black carbon at individual addresses, while also providing health risk assessments and alternative, healthier neighborhoods within ones price range. Presentation here: https://docs.google.com/presentation/d/1-6HEQ-6gWfiFWbRJcssHNGMgwIKaKdg4L1SnotYCF5c/edit?usp=sharing
 
 <img src="graphs/NO2_heatmap.png" height="500">
 
